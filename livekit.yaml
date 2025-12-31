@@ -1,0 +1,33 @@
+# LiveKit Server Configuration
+# For development/local use
+
+port: 7880
+rtc:
+  port_range_start: 50100
+  port_range_end: 50200
+  tcp_port: 7881
+  # Use your actual IP for production
+  # use_external_ip: true
+
+# API Keys - セキュアなキー（本番環境用に変更済み）
+# 形式: api_key: api_secret
+keys:
+  TRCcYOdot1iQoUzr: G7gRFAmEdtB5cDM6fxPr0zjBi4O39OyA
+
+# Logging
+logging:
+  level: info
+  # pion_level: warn
+
+# Room settings
+room:
+  # Max participants per room
+  max_participants: 25
+  # Empty room timeout (seconds)
+  empty_timeout: 300
+  # Departure timeout (seconds)
+  departure_timeout: 20
+# Webhook (optional)
+# webhook:
+#   urls:
+#     - https://your-server.com/webhook
