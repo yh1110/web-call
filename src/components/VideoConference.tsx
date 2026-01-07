@@ -275,7 +275,7 @@ export default function VideoConference({
               />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold">WebCall</h1>
+          <h1 className="text-lg font-semibold">MetaLive</h1>
         </div>
 
         <RoomInfo roomName={roomName} />

@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WebCall - 音声通話アプリ",
+  title: "MetaLive - 音声通話アプリ",
   description: "シンプルでパワフルなグループ音声通話・画面共有アプリ",
 };
 
