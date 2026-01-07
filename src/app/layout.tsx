@@ -17,6 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "MetaLive - 音声通話アプリ",
   description: "シンプルでパワフルなグループ音声通話・画面共有アプリ",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
