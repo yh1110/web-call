@@ -1,4 +1,4 @@
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { NextRequest, NextResponse } from "next/server";
 
 const ROOM_CODE_REGEX = /^[A-Z0-9]{6}$/;
@@ -27,12 +27,44 @@ export async function POST(request: NextRequest) {
 
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
     if (!apiKey || !apiSecret) {
       return NextResponse.json(
         { error: "LiveKit の設定が不完全です" },
         { status: 500 }
       );
+    }
+
+    // ルーム内の既存参加者をチェック
+    if (livekitUrl) {
+      try {
+        const roomService = new RoomServiceClient(
+          livekitUrl,
+          apiKey,
+          apiSecret
+        );
+        const participants = await roomService.listParticipants(normalizedRoom);
+
+        // 同じ名前の参加者が既に存在するかチェック
+        const existingParticipant = participants.find(
+          (p) => p.identity === normalizedParticipant
+        );
+
+        if (existingParticipant) {
+          return NextResponse.json(
+            {
+              error:
+                "この名前は既に使用されています。別の名前を入力してください",
+            },
+            { status: 409 } // Conflict
+          );
+        }
+      } catch (err) {
+        // ルームが存在しない場合は参加者もいないのでOK
+        // その他のエラーはログに出力して続行
+        console.log("Room check skipped:", err);
+      }
     }
 
     const ttlEnv = Number(process.env.TOKEN_TTL_SECONDS ?? 3600);
