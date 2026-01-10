@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import dynamic from "next/dynamic";
-
-// Dynamically import VideoConference to avoid SSR issues
-const VideoConference = dynamic(() => import("@/components/VideoConference"), {
-  ssr: false,
-});
+import { useRouter } from "next/navigation";
 
 function generateRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -18,9 +13,9 @@ function generateRoomCode(): string {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [roomName, setRoomName] = useState("");
   const [userName, setUserName] = useState("");
-  const [token, setToken] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,7 +26,16 @@ export default function Home() {
 
   const handleJoinRoom = useCallback(async () => {
     if (!roomName.trim() || !userName.trim()) {
-      setError("ルーム名と名前を入力してください");
+      setError("ルームコードと名前を入力してください");
+      return;
+    }
+
+    const normalizedRoom = roomName.toUpperCase().trim();
+    const normalizedName = userName.trim();
+
+    // ルームコードの形式チェック
+    if (!/^[A-Z0-9]{6}$/.test(normalizedRoom)) {
+      setError("ルームコードは英大文字と数字6桁で入力してください");
       return;
     }
 
@@ -39,12 +43,13 @@ export default function Home() {
     setError("");
 
     try {
+      // トークン取得（重複チェック）
       const response = await fetch("/api/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          roomName: roomName.toUpperCase().trim(),
-          participantName: userName.trim(),
+          roomName: normalizedRoom,
+          participantName: normalizedName,
         }),
       });
 
@@ -54,29 +59,17 @@ export default function Home() {
       }
 
       const { token } = await response.json();
-      setToken(token);
+
+      // トークンをセッションストレージに一時保存（ルームページで使用後削除）
+      sessionStorage.setItem(`metalive_token_${normalizedRoom}`, token);
+
+      // ルームページへ遷移
+      router.push(`/room/${normalizedRoom}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setIsJoining(false);
     }
-  }, [roomName, userName]);
-
-  const handleDisconnect = useCallback(() => {
-    setToken("");
-    setIsJoining(false);
-  }, []);
-
-  // If connected, show the video conference
-  if (token) {
-    return (
-      <VideoConference
-        token={token}
-        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL || ""}
-        roomName={roomName.toUpperCase().trim()}
-        onDisconnect={handleDisconnect}
-      />
-    );
-  }
+  }, [roomName, userName, router]);
 
   // Landing page
   return (
