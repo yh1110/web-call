@@ -3,7 +3,6 @@
 import "@livekit/components-styles";
 import {
   LiveKitRoom,
-  RoomAudioRenderer,
   useTracks,
   ParticipantTile,
   TrackRefContext,
@@ -11,8 +10,114 @@ import {
   useLocalParticipant,
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { useCallback, useState, useRef, useEffect } from "react";
+import {
+  Track,
+  RemoteTrackPublication,
+  RemoteParticipant,
+} from "livekit-client";
+import {
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+  createContext,
+  useContext,
+} from "react";
+
+// 参加者ごとの音量を管理するコンテキスト
+interface VolumeContextType {
+  volumes: Record<string, number>;
+  setVolume: (participantId: string, volume: number) => void;
+}
+
+const VolumeContext = createContext<VolumeContextType>({
+  volumes: {},
+  setVolume: () => {},
+});
+
+function useVolumeContext() {
+  return useContext(VolumeContext);
+}
+
+// カスタムオーディオレンダラー（個別音量制御対応）
+function CustomAudioRenderer() {
+  const tracks = useTracks(
+    [{ source: Track.Source.Microphone, withPlaceholder: false }],
+    {
+      onlySubscribed: true,
+    }
+  );
+  const { volumes } = useVolumeContext();
+  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  useEffect(() => {
+    const currentAudioRefs = audioRefs.current;
+
+    // 現在のトラックIDのセット
+    const currentTrackIds = new Set(tracks.map((t) => t.participant.identity));
+
+    // 不要なオーディオ要素を削除
+    currentAudioRefs.forEach((audio, id) => {
+      if (!currentTrackIds.has(id)) {
+        audio.pause();
+        audio.srcObject = null;
+        currentAudioRefs.delete(id);
+      }
+    });
+
+    // 各トラックのオーディオ要素を作成・更新
+    tracks.forEach((trackRef) => {
+      const participantId = trackRef.participant.identity;
+      const publication = trackRef.publication as
+        | RemoteTrackPublication
+        | undefined;
+
+      // ローカル参加者のトラックはスキップ
+      if (!(trackRef.participant instanceof RemoteParticipant)) {
+        return;
+      }
+
+      if (!publication?.track) return;
+
+      let audio = currentAudioRefs.get(participantId);
+
+      if (!audio) {
+        audio = new Audio();
+        audio.autoplay = true;
+        currentAudioRefs.set(participantId, audio);
+      }
+
+      // MediaStreamを設定
+      const mediaStream = new MediaStream([publication.track.mediaStreamTrack]);
+      if (audio.srcObject !== mediaStream) {
+        audio.srcObject = mediaStream;
+      }
+
+      // 音量を設定（0-1の範囲）
+      const volume = volumes[participantId] ?? 100;
+      audio.volume = volume / 100;
+    });
+
+    return () => {
+      // クリーンアップ
+      currentAudioRefs.forEach((audio) => {
+        audio.pause();
+        audio.srcObject = null;
+      });
+      currentAudioRefs.clear();
+    };
+  }, [tracks, volumes]);
+
+  // 音量変更時の更新
+  useEffect(() => {
+    audioRefs.current.forEach((audio, participantId) => {
+      const volume = volumes[participantId] ?? 100;
+      audio.volume = volume / 100;
+    });
+  }, [volumes]);
+
+  return null;
+}
 
 // iOS/モバイル検出
 function useDeviceDetection() {
@@ -338,6 +443,7 @@ function AudioOnlyGrid() {
     ],
     { onlySubscribed: false }
   );
+  const { localParticipant } = useLocalParticipant();
 
   // Screen share tracks
   const screenTracks = tracks.filter(
@@ -364,6 +470,9 @@ function AudioOnlyGrid() {
               key={track.participant.identity}
               participant={track.participant}
               isSpeaking={track.participant.isSpeaking}
+              isLocalParticipant={
+                track.participant.identity === localParticipant?.identity
+              }
             />
           ))}
         </div>
@@ -380,6 +489,9 @@ function AudioOnlyGrid() {
             key={track.participant.identity}
             participant={track.participant}
             isSpeaking={track.participant.isSpeaking}
+            isLocalParticipant={
+              track.participant.identity === localParticipant?.identity
+            }
             large
           />
         ))}
@@ -704,11 +816,17 @@ function AudioParticipantTile({
   participant,
   isSpeaking,
   large = false,
+  isLocalParticipant = false,
 }: {
   participant: { identity: string; isSpeaking: boolean; audioLevel?: number };
   isSpeaking: boolean;
   large?: boolean;
+  isLocalParticipant?: boolean;
 }) {
+  const { volumes, setVolume } = useVolumeContext();
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volume = volumes[participant.identity] ?? 100;
+
   const initials = participant.identity
     .split(" ")
     .map((n) => n[0])
@@ -727,12 +845,77 @@ function AudioParticipantTile({
   const colorIndex = participant.identity.charCodeAt(0) % colors.length;
   const gradientClass = colors[colorIndex];
 
+  const handleVolumeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setVolume(participant.identity, Number(e.target.value));
+    },
+    [participant.identity, setVolume]
+  );
+
+  // 音量アイコンを取得
+  const getVolumeIcon = () => {
+    if (volume === 0) {
+      return (
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+          />
+        </svg>
+      );
+    } else if (volume < 50) {
+      return (
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15.536 8.464a5 5 0 010 7.072M12 6.253v11.494m0-11.494l-4.707 4.707H6a1 1 0 00-1 1v2.08a1 1 0 001 1h1.293l4.707 4.707m0-11.494a3 3 0 000 11.494"
+          />
+        </svg>
+      );
+    } else {
+      return (
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+          />
+        </svg>
+      );
+    }
+  };
+
   return (
     <div
       className={`
         relative flex flex-col items-center justify-center
         bg-secondary rounded-xl sm:rounded-2xl border border-border
-        transition-all duration-300 overflow-hidden
+        transition-all duration-300 overflow-visible
         ${
           large
             ? "aspect-square min-h-[100px] sm:min-h-[140px]"
@@ -797,7 +980,142 @@ function AudioParticipantTile({
           </div>
         ) : null}
       </div>
+
+      {/* Volume control button - only for remote participants */}
+      {!isLocalParticipant && (
+        <div
+          className={`absolute ${
+            large
+              ? "bottom-2 right-2 sm:bottom-3 sm:right-3"
+              : "bottom-1 right-1"
+          }`}
+        >
+          <button
+            onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+            className={`
+              flex items-center justify-center rounded-full
+              transition-all duration-200
+              ${large ? "w-7 h-7 sm:w-8 sm:h-8" : "w-5 h-5 sm:w-6 sm:h-6"}
+              ${
+                volume === 0
+                  ? "bg-danger/20 text-danger"
+                  : "bg-white/10 hover:bg-white/20 text-foreground/70 hover:text-foreground"
+              }
+            `}
+            title="音量調整"
+          >
+            {getVolumeIcon()}
+          </button>
+
+          {/* Volume slider popup */}
+          {showVolumeSlider && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowVolumeSlider(false)}
+              />
+
+              {/* Slider */}
+              <div className="absolute bottom-full right-0 mb-2 z-50 p-3 bg-secondary/95 backdrop-blur-xl rounded-xl border border-border/50 shadow-2xl shadow-black/40 min-w-[180px]">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() =>
+                      setVolume(participant.identity, volume === 0 ? 100 : 0)
+                    }
+                    className={`
+                      flex items-center justify-center w-8 h-8 rounded-lg
+                      transition-colors
+                      ${
+                        volume === 0
+                          ? "bg-danger/20 text-danger"
+                          : "bg-white/10 hover:bg-white/20 text-foreground"
+                      }
+                    `}
+                    title={volume === 0 ? "ミュート解除" : "ミュート"}
+                  >
+                    {getVolumeIcon()}
+                  </button>
+
+                  <div className="flex-1 relative">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volume}
+                      onChange={handleVolumeChange}
+                      className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-4
+                        [&::-webkit-slider-thumb]:h-4
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-accent
+                        [&::-webkit-slider-thumb]:shadow-lg
+                        [&::-webkit-slider-thumb]:cursor-pointer
+                        [&::-webkit-slider-thumb]:transition-transform
+                        [&::-webkit-slider-thumb]:hover:scale-110
+                        [&::-moz-range-thumb]:w-4
+                        [&::-moz-range-thumb]:h-4
+                        [&::-moz-range-thumb]:rounded-full
+                        [&::-moz-range-thumb]:bg-accent
+                        [&::-moz-range-thumb]:border-0
+                        [&::-moz-range-thumb]:shadow-lg
+                        [&::-moz-range-thumb]:cursor-pointer
+                      "
+                      style={{
+                        background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volume}%, rgba(255,255,255,0.1) ${volume}%, rgba(255,255,255,0.1) 100%)`,
+                      }}
+                    />
+                  </div>
+
+                  <span className="text-xs font-mono text-muted w-8 text-right">
+                    {volume}%
+                  </span>
+                </div>
+
+                {/* Preset buttons */}
+                <div className="flex gap-1.5 mt-2 pt-2 border-t border-border/30">
+                  {[0, 25, 50, 75, 100].map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => setVolume(participant.identity, preset)}
+                      className={`
+                        flex-1 py-1 text-xs font-medium rounded-md transition-colors
+                        ${
+                          volume === preset
+                            ? "bg-accent/20 text-accent"
+                            : "bg-white/5 hover:bg-white/10 text-muted hover:text-foreground"
+                        }
+                      `}
+                    >
+                      {preset}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+// 音量状態を管理するラッパーコンポーネント
+function VolumeProvider({ children }: { children: React.ReactNode }) {
+  const [volumes, setVolumes] = useState<Record<string, number>>({});
+
+  const setVolume = useCallback((participantId: string, volume: number) => {
+    setVolumes((prev) => ({
+      ...prev,
+      [participantId]: Math.max(0, Math.min(100, volume)),
+    }));
+  }, []);
+
+  return (
+    <VolumeContext.Provider value={{ volumes, setVolume }}>
+      {children}
+    </VolumeContext.Provider>
   );
 }
 
@@ -822,46 +1140,49 @@ export default function VideoConference({
         },
       }}
     >
-      {/* Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-3 sm:px-6 py-3 border-b border-border bg-secondary/90 backdrop-blur-md gap-2">
-        <div className="hidden sm:flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-              />
-            </svg>
+      <VolumeProvider>
+        {/* Fixed Header */}
+        <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-3 sm:px-6 py-3 border-b border-border bg-secondary/90 backdrop-blur-md gap-2">
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-lg font-semibold">MetaLive</h1>
           </div>
-          <h1 className="text-lg font-semibold">MetaLive</h1>
-        </div>
 
-        <RoomInfo roomName={roomName} />
+          <RoomInfo roomName={roomName} />
 
-        <button
-          onClick={onDisconnect}
-          className="px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 rounded-xl transition-colors whitespace-nowrap min-h-[40px]"
-        >
-          退出
-        </button>
-      </header>
+          <button
+            onClick={onDisconnect}
+            className="px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 rounded-xl transition-colors whitespace-nowrap min-h-[40px]"
+          >
+            退出
+          </button>
+        </header>
 
-      {/* Main content - scrollable with padding for fixed header and control bar */}
-      <main className="pt-16 pb-24">
-        <AudioOnlyGrid />
-      </main>
+        {/* Main content - scrollable with padding for fixed header and control bar */}
+        <main className="pt-16 pb-24">
+          <AudioOnlyGrid />
+        </main>
 
-      {/* Custom Control Bar */}
-      <CustomControlBar />
+        {/* Custom Control Bar */}
+        <CustomControlBar />
 
-      <RoomAudioRenderer />
+        {/* Custom Audio Renderer with individual volume control */}
+        <CustomAudioRenderer />
+      </VolumeProvider>
     </LiveKitRoom>
   );
 }
