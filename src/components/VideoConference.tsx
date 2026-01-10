@@ -14,6 +14,55 @@ import {
 import { Track } from "livekit-client";
 import { useCallback, useState, useRef, useEffect } from "react";
 
+// iOS/モバイル検出
+function useDeviceDetection() {
+  // SSR対応のため、初期値はサーバーサイドで安全な値を設定
+  const getDeviceInfo = useCallback(() => {
+    if (typeof window === "undefined") {
+      return {
+        isIOS: false,
+        isMobile: false,
+        canScreenShare: true,
+        canFullscreen: true,
+      };
+    }
+
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        userAgent
+      );
+
+    // iOS Safari では getDisplayMedia がサポートされていない
+    const canScreenShare =
+      typeof navigator.mediaDevices?.getDisplayMedia === "function" && !isIOS;
+
+    // iOS Safari では Fullscreen API が制限されている
+    const canFullscreen =
+      document.fullscreenEnabled ||
+      // @ts-expect-error webkit prefix
+      document.webkitFullscreenEnabled ||
+      false;
+
+    return {
+      isIOS,
+      isMobile,
+      canScreenShare,
+      canFullscreen: canFullscreen && !isIOS,
+    };
+  }, []);
+
+  const [deviceInfo, setDeviceInfo] = useState(getDeviceInfo);
+
+  // クライアントサイドでのみ再計算
+  useEffect(() => {
+    setDeviceInfo(getDeviceInfo());
+  }, [getDeviceInfo]);
+
+  return deviceInfo;
+}
+
 interface VideoConferenceProps {
   token: string;
   serverUrl: string;
@@ -91,8 +140,16 @@ function RoomInfo({ roomName }: { roomName: string }) {
 function ScreenShareTile({ track }: { track: TrackReferenceOrPlaceholder }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // iOS用の拡大表示
+  const { canFullscreen } = useDeviceDetection();
 
   const toggleFullscreen = useCallback(async () => {
+    // iOS/非対応ブラウザの場合はモーダル表示
+    if (!canFullscreen) {
+      setIsExpanded(!isExpanded);
+      return;
+    }
+
     if (!containerRef.current) return;
 
     try {
@@ -105,8 +162,10 @@ function ScreenShareTile({ track }: { track: TrackReferenceOrPlaceholder }) {
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
+      // フォールバック：モーダル表示
+      setIsExpanded(!isExpanded);
     }
-  }, []);
+  }, [canFullscreen, isExpanded]);
 
   // Listen for fullscreen changes (e.g., user presses Escape)
   const handleFullscreenChange = useCallback(() => {
@@ -121,18 +180,69 @@ function ScreenShareTile({ track }: { track: TrackReferenceOrPlaceholder }) {
     };
   }, [handleFullscreenChange]);
 
+  const isLarge = isFullscreen || isExpanded;
+
+  // iOS用の拡大モーダル
+  if (isExpanded && !canFullscreen) {
+    return (
+      <>
+        {/* 背景オーバーレイ */}
+        <div
+          className="fixed inset-0 bg-black/90 z-50"
+          onClick={() => setIsExpanded(false)}
+        />
+
+        {/* 拡大表示 */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="relative w-full h-full max-h-[90vh]">
+            <TrackRefContext.Provider value={track}>
+              <ParticipantTile />
+            </TrackRefContext.Provider>
+
+            {/* 閉じるボタン */}
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="absolute top-4 right-4 z-10 flex items-center justify-center w-12 h-12 bg-secondary/80 backdrop-blur-sm rounded-xl border border-border/50"
+            >
+              <svg
+                className="w-6 h-6 text-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+
+            {/* 参加者名 */}
+            <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg">
+              <span className="text-sm font-medium text-white">
+                {track.participant.identity}の画面
+              </span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
       className={`relative bg-secondary rounded-xl overflow-hidden ${
-        isFullscreen ? "rounded-none h-screen w-screen" : "aspect-video"
+        isLarge ? "rounded-none h-screen w-screen" : "aspect-video"
       }`}
     >
       <TrackRefContext.Provider value={track}>
         <ParticipantTile />
       </TrackRefContext.Provider>
 
-      {/* Fullscreen toggle button */}
+      {/* Fullscreen/Expand toggle button */}
       <button
         onClick={toggleFullscreen}
         className={`
@@ -145,9 +255,9 @@ function ScreenShareTile({ track }: { track: TrackReferenceOrPlaceholder }) {
           hover:scale-105 active:scale-95
           group
         `}
-        title={isFullscreen ? "全画面を終了" : "全画面表示"}
+        title={isLarge ? "閉じる" : "拡大表示"}
       >
-        {isFullscreen ? (
+        {isLarge ? (
           <svg
             className="w-5 h-5 sm:w-6 sm:h-6 text-foreground/70 group-hover:text-foreground transition-colors"
             fill="none"
@@ -320,6 +430,8 @@ function CustomControlBar() {
   const { localParticipant } = useLocalParticipant();
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [showUnsupportedMessage, setShowUnsupportedMessage] = useState(false);
+  const { canScreenShare } = useDeviceDetection();
 
   const isMicEnabled = localParticipant?.isMicrophoneEnabled ?? false;
 
@@ -368,15 +480,30 @@ function CustomControlBar() {
   }, [localParticipant]);
 
   const handleScreenShareClick = useCallback(() => {
+    if (!canScreenShare) {
+      setShowUnsupportedMessage(true);
+      setTimeout(() => setShowUnsupportedMessage(false), 3000);
+      return;
+    }
+
     if (isScreenSharing) {
       stopScreenShare();
     } else {
       setShowQualityMenu(true);
     }
-  }, [isScreenSharing, stopScreenShare]);
+  }, [isScreenSharing, stopScreenShare, canScreenShare]);
 
   return (
     <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50">
+      {/* 画面共有非対応メッセージ (iOS等) */}
+      {showUnsupportedMessage && (
+        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
+          <div className="px-4 py-2.5 bg-amber-500/90 text-black text-sm font-medium rounded-xl shadow-lg animate-fade-in">
+            📱 この端末では画面共有できません
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-2.5 sm:py-3 bg-secondary/80 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl shadow-black/30">
         {/* Microphone Button */}
         <button
