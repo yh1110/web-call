@@ -36,11 +36,16 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  min-height: 100vh;
 }
 
 /* LiveKit Component Overrides */
@@ -48,32 +53,9 @@ body {
   background: var(--background) !important;
 }
 
+/* Hide default LiveKit control bar since we use custom one */
 .lk-control-bar {
-  background: var(--secondary) !important;
-  border-top: 1px solid var(--border) !important;
-  padding: 1rem !important;
-}
-
-.lk-button {
-  background: var(--secondary) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--foreground) !important;
-  border-radius: 0.75rem !important;
-  transition: all 0.2s ease !important;
-}
-
-.lk-button:hover {
-  background: var(--secondary-hover) !important;
-  border-color: var(--primary) !important;
-}
-
-.lk-button[data-lk-muted="true"] {
-  background: var(--danger) !important;
-  border-color: var(--danger) !important;
-}
-
-.lk-button[data-lk-muted="true"]:hover {
-  background: var(--danger-hover) !important;
+  display: none !important;
 }
 
 .lk-participant-tile {
@@ -163,8 +145,9 @@ body {
 
 /* Gradient backgrounds */
 .gradient-bg {
-  background: linear-gradient(135deg, 
-    rgba(99, 102, 241, 0.1) 0%, 
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.1) 0%,
     rgba(34, 197, 94, 0.05) 50%,
     rgba(99, 102, 241, 0.1) 100%
   );
@@ -181,12 +164,8 @@ body {
   padding: 1px;
   border-radius: inherit;
   background: linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-mask: 
-    linear-gradient(#fff 0 0) content-box, 
-    linear-gradient(#fff 0 0);
-  mask: 
-    linear-gradient(#fff 0 0) content-box, 
-    linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;

@@ -80,13 +80,13 @@ export default function Home() {
 
   // Landing page
   return (
-    <div className="min-h-screen flex flex-col gradient-bg">
+    <div className="h-screen flex flex-col gradient-bg overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border/50">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
             <svg
-              className="w-5 h-5 text-white"
+              className="w-4 h-4 sm:w-5 sm:h-5 text-white"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -99,27 +99,33 @@ export default function Home() {
               />
             </svg>
           </div>
-          <span className="text-xl font-bold tracking-tight">MetaLive</span>
+          <span className="text-lg sm:text-xl font-bold tracking-tight">
+            MetaLive
+          </span>
         </div>
-        <div className="text-sm text-muted">最大20人 • 音声通話 • 画面共有</div>
+        <div className="hidden sm:block text-sm text-muted">
+          最大20人 • 音声通話 • 画面共有
+        </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md space-y-8 animate-fade-in">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 overflow-auto">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8 animate-fade-in">
           {/* Title */}
-          <div className="text-center space-y-3">
-            <h1 className="text-4xl font-bold tracking-tight">
+          <div className="text-center space-y-2 sm:space-y-3">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
               Meta
               <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Live
               </span>
             </h1>
-            <p className="text-muted text-lg">シンプルな音声通話と画面共有</p>
+            <p className="text-muted text-base sm:text-lg">
+              シンプルな音声通話と画面共有
+            </p>
           </div>
 
           {/* Join form */}
-          <div className="bg-secondary/80 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-2xl shadow-black/20 gradient-border">
+          <div className="bg-secondary/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-border shadow-2xl shadow-black/20 gradient-border">
             <div className="space-y-5">
               {/* Room code input */}
               <div className="space-y-2">
