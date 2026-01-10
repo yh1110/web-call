@@ -1016,20 +1016,21 @@ function AudioParticipantTile({
                 onClick={() => setShowVolumeSlider(false)}
               />
 
-              {/* Slider */}
-              <div className="absolute bottom-full right-0 mb-2 z-50 p-3 bg-secondary/95 backdrop-blur-xl rounded-xl border border-border/50 shadow-2xl shadow-black/40 min-w-[180px]">
-                <div className="flex items-center gap-3">
+              {/* Minimal Slider */}
+              <div className="absolute bottom-full right-0 mb-2 z-50">
+                <div className="flex items-center gap-2.5 px-3 py-2.5 bg-black/80 backdrop-blur-xl rounded-full border border-white/10 shadow-xl">
+                  {/* Mute toggle */}
                   <button
                     onClick={() =>
                       setVolume(participant.identity, volume === 0 ? 100 : 0)
                     }
                     className={`
-                      flex items-center justify-center w-8 h-8 rounded-lg
-                      transition-colors
+                      flex items-center justify-center w-6 h-6 rounded-full
+                      transition-all duration-200
                       ${
                         volume === 0
-                          ? "bg-danger/20 text-danger"
-                          : "bg-white/10 hover:bg-white/20 text-foreground"
+                          ? "text-rose-400 hover:text-rose-300"
+                          : "text-white/60 hover:text-white"
                       }
                     `}
                     title={volume === 0 ? "ミュート解除" : "ミュート"}
@@ -1037,60 +1038,33 @@ function AudioParticipantTile({
                     {getVolumeIcon()}
                   </button>
 
-                  <div className="flex-1 relative">
+                  {/* Sleek slider */}
+                  <div className="relative w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    {/* Progress fill */}
+                    <div
+                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-accent to-primary rounded-full"
+                      style={{ width: `${volume}%` }}
+                    />
+                    {/* Input */}
                     <input
                       type="range"
                       min="0"
                       max="100"
                       value={volume}
                       onChange={handleVolumeChange}
-                      className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-accent
-                        [&::-webkit-slider-thumb]:shadow-lg
-                        [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-webkit-slider-thumb]:transition-transform
-                        [&::-webkit-slider-thumb]:hover:scale-110
-                        [&::-moz-range-thumb]:w-4
-                        [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full
-                        [&::-moz-range-thumb]:bg-accent
-                        [&::-moz-range-thumb]:border-0
-                        [&::-moz-range-thumb]:shadow-lg
-                        [&::-moz-range-thumb]:cursor-pointer
-                      "
-                      style={{
-                        background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volume}%, rgba(255,255,255,0.1) ${volume}%, rgba(255,255,255,0.1) 100%)`,
-                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {/* Thumb indicator */}
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md shadow-black/30 pointer-events-none"
+                      style={{ left: `calc(${volume}% - 6px)` }}
                     />
                   </div>
 
-                  <span className="text-xs font-mono text-muted w-8 text-right">
-                    {volume}%
+                  {/* Volume percentage */}
+                  <span className="text-[11px] font-medium text-white/50 w-7 text-right tabular-nums">
+                    {volume}
                   </span>
-                </div>
-
-                {/* Preset buttons */}
-                <div className="flex gap-1.5 mt-2 pt-2 border-t border-border/30">
-                  {[0, 25, 50, 75, 100].map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => setVolume(participant.identity, preset)}
-                      className={`
-                        flex-1 py-1 text-xs font-medium rounded-md transition-colors
-                        ${
-                          volume === preset
-                            ? "bg-accent/20 text-accent"
-                            : "bg-white/5 hover:bg-white/10 text-muted hover:text-foreground"
-                        }
-                      `}
-                    >
-                      {preset}%
-                    </button>
-                  ))}
                 </div>
               </div>
             </>
