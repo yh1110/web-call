@@ -108,7 +108,7 @@ function AudioOnlyGrid() {
 
   if (screenTracks.length > 0) {
     return (
-      <div className="flex flex-col h-full gap-2 sm:gap-4 p-2 sm:p-4 pb-20 sm:pb-24">
+      <div className="flex flex-col min-h-[50vh] gap-2 sm:gap-4 p-3 sm:p-6">
         {/* Screen share area */}
         <div className="flex-1 min-h-0">
           <GridLayout tracks={screenTracks}>
@@ -134,8 +134,8 @@ function AudioOnlyGrid() {
 
   // Audio-only grid view
   return (
-    <div className="h-full overflow-hidden flex items-start justify-center p-3 sm:p-6 pb-20 sm:pb-24">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 auto-rows-fr w-full">
+    <div className="p-3 sm:p-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
         {audioParticipants.map((track) => (
           <AudioParticipantTile
             key={track.participant.identity}
@@ -367,7 +367,7 @@ export default function VideoConference({
       serverUrl={serverUrl}
       connect={true}
       onDisconnected={onDisconnect}
-      className="h-screen flex flex-col bg-background overflow-hidden"
+      className="min-h-screen bg-background"
       options={{
         adaptiveStream: true,
         dynacast: true,
@@ -376,8 +376,8 @@ export default function VideoConference({
         },
       }}
     >
-      {/* Header */}
-      <header className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-border bg-secondary/50 backdrop-blur-sm gap-2 shrink-0">
+      {/* Fixed Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-3 sm:px-6 py-3 border-b border-border bg-secondary/90 backdrop-blur-md gap-2">
         <div className="hidden sm:flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <svg
@@ -407,8 +407,8 @@ export default function VideoConference({
         </button>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden relative">
+      {/* Main content - scrollable with padding for fixed header and control bar */}
+      <main className="pt-16 pb-24">
         <AudioOnlyGrid />
       </main>
       

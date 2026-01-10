@@ -80,7 +80,7 @@ export default function Home() {
 
   // Landing page
   return (
-    <div className="h-screen flex flex-col gradient-bg overflow-hidden">
+    <div className="min-h-screen flex flex-col gradient-bg">
       {/* Header */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border/50">
         <div className="flex items-center gap-2 sm:gap-3">
