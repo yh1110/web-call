@@ -14,6 +14,7 @@ import {
   Track,
   RemoteTrackPublication,
   RemoteParticipant,
+  AudioPresets,
 } from "livekit-client";
 import {
   useCallback,
@@ -1091,8 +1092,19 @@ export default function VideoConference({
       options={{
         adaptiveStream: true,
         dynacast: true,
+        // オーディオキャプチャ設定（通話向け最適化）
+        audioCaptureDefaults: {
+          echoCancellation: true, // エコーキャンセル
+          // noiseSuppression: true, // ノイズ抑制
+          sampleRate: 48000, // 48kHz サンプルレート
+          channelCount: 1, // モノラル（通話向け）
+        },
         publishDefaults: {
           simulcast: true,
+          // 通話向け音声プリセット\
+          audioPreset: AudioPresets.musicHighQuality,
+          // dtx: true, // 無音時は帯域節約
+          red: true, // パケットロス対策
         },
       }}
     >
