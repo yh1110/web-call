@@ -254,9 +254,48 @@ function AudioOnlyGrid() {
   );
 }
 
+// 画質プリセット
+const QUALITY_PRESETS = {
+  ultra: {
+    label: "超高画質",
+    description: "4K / 60fps",
+    resolution: { width: 3840, height: 2160 },
+    frameRate: 60,
+    icon: "✨",
+    bitrate: 15_000_000,
+  },
+  high: {
+    label: "高画質",
+    description: "1080p / 30fps",
+    resolution: { width: 1920, height: 1080 },
+    frameRate: 30,
+    icon: "🎬",
+    bitrate: 5_000_000,
+  },
+  balanced: {
+    label: "バランス",
+    description: "720p / 30fps",
+    resolution: { width: 1280, height: 720 },
+    frameRate: 30,
+    icon: "⚖️",
+    bitrate: 2_500_000,
+  },
+  light: {
+    label: "軽量",
+    description: "720p / 15fps",
+    resolution: { width: 1280, height: 720 },
+    frameRate: 15,
+    icon: "🪶",
+    bitrate: 1_500_000,
+  },
+} as const;
+
+type QualityPreset = keyof typeof QUALITY_PRESETS;
+
 function CustomControlBar() {
   const { localParticipant } = useLocalParticipant();
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
   const isMicEnabled = localParticipant?.isMicrophoneEnabled ?? false;
 
@@ -266,17 +305,51 @@ function CustomControlBar() {
     }
   }, [localParticipant, isMicEnabled]);
 
-  const toggleScreenShare = useCallback(async () => {
-    if (localParticipant) {
-      if (isScreenSharing) {
-        await localParticipant.setScreenShareEnabled(false);
-        setIsScreenSharing(false);
-      } else {
-        await localParticipant.setScreenShareEnabled(true);
+  const startScreenShare = useCallback(
+    async (quality: QualityPreset) => {
+      if (!localParticipant) return;
+
+      const preset = QUALITY_PRESETS[quality];
+
+      try {
+        await localParticipant.setScreenShareEnabled(
+          true,
+          {
+            resolution: preset.resolution,
+            contentHint: quality === "light" ? "detail" : "motion",
+          },
+          {
+            videoCodec: quality === "ultra" ? "vp9" : "vp8",
+            screenShareEncoding: {
+              maxFramerate: preset.frameRate,
+              maxBitrate: preset.bitrate,
+            },
+          }
+        );
         setIsScreenSharing(true);
+        setShowQualityMenu(false);
+      } catch (err) {
+        console.error("Screen share error:", err);
+        setShowQualityMenu(false);
       }
+    },
+    [localParticipant]
+  );
+
+  const stopScreenShare = useCallback(async () => {
+    if (localParticipant) {
+      await localParticipant.setScreenShareEnabled(false);
+      setIsScreenSharing(false);
     }
-  }, [localParticipant, isScreenSharing]);
+  }, [localParticipant]);
+
+  const handleScreenShareClick = useCallback(() => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      setShowQualityMenu(true);
+    }
+  }, [isScreenSharing, stopScreenShare]);
 
   return (
     <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50">
@@ -356,72 +429,121 @@ function CustomControlBar() {
         {/* Divider */}
         <div className="w-px h-8 bg-border/50" />
 
-        {/* Screen Share Button */}
-        <button
-          onClick={toggleScreenShare}
-          className={`
-            relative group flex items-center justify-center
-            w-12 h-12 sm:w-14 sm:h-14 rounded-xl
-            transition-all duration-300 ease-out
-            ${
-              isScreenSharing
-                ? "bg-gradient-to-br from-primary/30 to-accent/20 hover:from-primary/40 hover:to-accent/30 border border-primary/40"
-                : "bg-gradient-to-br from-white/5 to-white/10 hover:from-white/10 hover:to-white/15 border border-white/10"
-            }
-            hover:scale-105 hover:shadow-lg active:scale-95
-          `}
-          title={isScreenSharing ? "画面共有を停止" : "画面を共有"}
-        >
-          {/* Glow effect */}
-          <div
+        {/* Screen Share Button with Quality Menu */}
+        <div className="relative">
+          <button
+            onClick={handleScreenShareClick}
             className={`
-            absolute inset-0 rounded-xl blur-md opacity-0 group-hover:opacity-50 transition-opacity
-            ${isScreenSharing ? "bg-primary" : "bg-white/20"}
-          `}
-          />
+              relative group flex items-center justify-center
+              w-12 h-12 sm:w-14 sm:h-14 rounded-xl
+              transition-all duration-300 ease-out
+              ${
+                isScreenSharing
+                  ? "bg-gradient-to-br from-primary/30 to-accent/20 hover:from-primary/40 hover:to-accent/30 border border-primary/40"
+                  : "bg-gradient-to-br from-white/5 to-white/10 hover:from-white/10 hover:to-white/15 border border-white/10"
+              }
+              hover:scale-105 hover:shadow-lg active:scale-95
+            `}
+            title={isScreenSharing ? "画面共有を停止" : "画面を共有"}
+          >
+            {/* Glow effect */}
+            <div
+              className={`
+              absolute inset-0 rounded-xl blur-md opacity-0 group-hover:opacity-50 transition-opacity
+              ${isScreenSharing ? "bg-primary" : "bg-white/20"}
+            `}
+            />
 
-          {isScreenSharing ? (
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6 text-primary relative z-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 8v4m0 0l-2-2m2 2l2-2"
-              />
-            </svg>
-          ) : (
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6 text-foreground/70 group-hover:text-foreground relative z-10 transition-colors"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          )}
+            {isScreenSharing ? (
+              <svg
+                className="w-5 h-5 sm:w-6 sm:h-6 text-primary relative z-10"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 8v4m0 0l-2-2m2 2l2-2"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-5 h-5 sm:w-6 sm:h-6 text-foreground/70 group-hover:text-foreground relative z-10 transition-colors"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            )}
 
-          {/* Live indicator when sharing */}
-          {isScreenSharing && (
-            <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-primary rounded text-[10px] font-bold text-white">
-              LIVE
-            </div>
+            {/* Live indicator when sharing */}
+            {isScreenSharing && (
+              <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-primary rounded text-[10px] font-bold text-white">
+                LIVE
+              </div>
+            )}
+          </button>
+
+          {/* Quality Selection Menu */}
+          {showQualityMenu && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowQualityMenu(false)}
+              />
+
+              {/* Menu */}
+              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 w-48 sm:w-56">
+                <div className="bg-secondary/95 backdrop-blur-xl rounded-xl border border-border/50 shadow-2xl shadow-black/40 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border/50">
+                    <span className="text-xs font-medium text-muted">
+                      画質を選択
+                    </span>
+                  </div>
+
+                  <div className="p-1.5">
+                    {(
+                      Object.entries(QUALITY_PRESETS) as [
+                        QualityPreset,
+                        (typeof QUALITY_PRESETS)[QualityPreset]
+                      ][]
+                    ).map(([key, preset]) => (
+                      <button
+                        key={key}
+                        onClick={() => startScreenShare(key)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors group"
+                      >
+                        <span className="text-lg">{preset.icon}</span>
+                        <div className="flex-1 text-left">
+                          <div className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                            {preset.label}
+                          </div>
+                          <div className="text-xs text-muted">
+                            {preset.description}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );
