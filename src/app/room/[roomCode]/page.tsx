@@ -22,19 +22,6 @@ export default function RoomPage() {
   const [inputName, setInputName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // ランディングページから遷移した場合、セッションストレージにトークンがある
-  useEffect(() => {
-    const tokenKey = `metalive_token_${roomCode}`;
-    const savedToken = sessionStorage.getItem(tokenKey);
-
-    if (savedToken) {
-      // トークンを使用後、セッションストレージから削除
-      sessionStorage.removeItem(tokenKey);
-      setToken(savedToken);
-    }
-    setIsLoading(false);
-  }, [roomCode]);
-
   // 名前入力して参加
   const handleJoin = useCallback(async () => {
     if (!inputName.trim()) {
@@ -69,15 +56,21 @@ export default function RoomPage() {
       setToken(token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
-    } finally {
       setIsConnecting(false);
     }
   }, [inputName, roomCode]);
 
+  // 初期ロード完了
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
+
   // 切断時の処理
   const handleDisconnect = useCallback(() => {
-    router.push("/");
-  }, [router]);
+    setToken("");
+    setIsConnecting(false);
+    // ルームページには留まる（名前入力に戻る）
+  }, []);
 
   // 初期ロード中
   if (isLoading) {
@@ -134,6 +127,12 @@ export default function RoomPage() {
             className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-all"
           >
             ホームに戻る
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="w-full py-3 bg-secondary hover:bg-secondary-hover border border-border rounded-xl transition-all text-muted hover:text-foreground"
+          >
+            キャンセル
           </button>
         </div>
       </div>

@@ -15,8 +15,6 @@ function generateRoomCode(): string {
 export default function Home() {
   const router = useRouter();
   const [roomName, setRoomName] = useState("");
-  const [userName, setUserName] = useState("");
-  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
 
   const handleCreateRoom = useCallback(() => {
@@ -24,14 +22,13 @@ export default function Home() {
     setRoomName(newCode);
   }, []);
 
-  const handleJoinRoom = useCallback(async () => {
-    if (!roomName.trim() || !userName.trim()) {
-      setError("ルームコードと名前を入力してください");
+  const handleJoinRoom = useCallback(() => {
+    if (!roomName.trim()) {
+      setError("ルームコードを入力してください");
       return;
     }
 
     const normalizedRoom = roomName.toUpperCase().trim();
-    const normalizedName = userName.trim();
 
     // ルームコードの形式チェック
     if (!/^[A-Z0-9]{6}$/.test(normalizedRoom)) {
@@ -39,37 +36,9 @@ export default function Home() {
       return;
     }
 
-    setIsJoining(true);
-    setError("");
-
-    try {
-      // トークン取得（重複チェック）
-      const response = await fetch("/api/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roomName: normalizedRoom,
-          participantName: normalizedName,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "参加に失敗しました");
-      }
-
-      const { token } = await response.json();
-
-      // トークンをセッションストレージに一時保存（ルームページで使用後削除）
-      sessionStorage.setItem(`metalive_token_${normalizedRoom}`, token);
-
-      // ルームページへ遷移
-      router.push(`/room/${normalizedRoom}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
-      setIsJoining(false);
-    }
-  }, [roomName, userName, router]);
+    // ルームページへ遷移
+    router.push(`/room/${normalizedRoom}`);
+  }, [roomName, router]);
 
   // Landing page
   return (
@@ -156,21 +125,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Name input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted">
-                  あなたの名前
-                </label>
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="名前を入力"
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  maxLength={20}
-                />
-              </div>
-
               {/* Error message */}
               {error && (
                 <div className="flex items-center gap-2 text-danger text-sm bg-danger/10 px-4 py-3 rounded-xl">
@@ -194,35 +148,10 @@ export default function Home() {
               {/* Join button */}
               <button
                 onClick={handleJoinRoom}
-                disabled={isJoining || !roomName.trim() || !userName.trim()}
+                disabled={!roomName.trim()}
                 className="w-full py-4 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
               >
-                {isJoining ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="w-5 h-5 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    接続中...
-                  </span>
-                ) : (
-                  "ルームに参加"
-                )}
+                ルームに参加
               </button>
             </div>
           </div>
