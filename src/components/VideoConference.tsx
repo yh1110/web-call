@@ -23,6 +23,7 @@ import {
   createContext,
   useContext,
 } from "react";
+import { Slider } from "@/components/ui/slider";
 
 // 参加者ごとの音量を管理するコンテキスト
 interface VolumeContextType {
@@ -845,13 +846,6 @@ function AudioParticipantTile({
   const colorIndex = participant.identity.charCodeAt(0) % colors.length;
   const gradientClass = colors[colorIndex];
 
-  const handleVolumeChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setVolume(participant.identity, Number(e.target.value));
-    },
-    [participant.identity, setVolume]
-  );
-
   // 音量アイコンを取得
   const getVolumeIcon = () => {
     if (volume === 0) {
@@ -1038,28 +1032,16 @@ function AudioParticipantTile({
                     {getVolumeIcon()}
                   </button>
 
-                  {/* Sleek slider */}
-                  <div className="relative w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    {/* Progress fill */}
-                    <div
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-accent to-primary rounded-full"
-                      style={{ width: `${volume}%` }}
-                    />
-                    {/* Input */}
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={volume}
-                      onChange={handleVolumeChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    {/* Thumb indicator */}
-                    <div
-                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md shadow-black/30 pointer-events-none"
-                      style={{ left: `calc(${volume}% - 6px)` }}
-                    />
-                  </div>
+                  {/* shadcn/ui Slider */}
+                  <Slider
+                    value={[volume]}
+                    onValueChange={(values) =>
+                      setVolume(participant.identity, values[0])
+                    }
+                    max={100}
+                    step={1}
+                    className="w-24 [&_[data-slot=slider-track]]:bg-white/10 [&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-accent [&_[data-slot=slider-range]]:to-primary [&_[data-slot=slider-thumb]]:size-3 [&_[data-slot=slider-thumb]]:border-0 [&_[data-slot=slider-thumb]]:shadow-md [&_[data-slot=slider-thumb]]:shadow-black/30"
+                  />
 
                   {/* Volume percentage */}
                   <span className="text-[11px] font-medium text-white/50 w-7 text-right tabular-nums">
