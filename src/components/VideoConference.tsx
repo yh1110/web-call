@@ -5,7 +5,6 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useTracks,
-  GridLayout,
   ParticipantTile,
   TrackRefContext,
   useParticipants,
@@ -88,11 +87,8 @@ function RoomInfo({ roomName }: { roomName: string }) {
   );
 }
 
-function ScreenShareWithFullscreen({
-  tracks,
-}: {
-  tracks: TrackReferenceOrPlaceholder[];
-}) {
+// 個別の画面共有タイル（全画面ボタン付き）
+function ScreenShareTile({ track }: { track: TrackReferenceOrPlaceholder }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -128,15 +124,13 @@ function ScreenShareWithFullscreen({
   return (
     <div
       ref={containerRef}
-      className={`relative h-full bg-background rounded-xl overflow-hidden ${
-        isFullscreen ? "rounded-none" : ""
+      className={`relative bg-secondary rounded-xl overflow-hidden ${
+        isFullscreen ? "rounded-none h-screen w-screen" : "aspect-video"
       }`}
     >
-      <GridLayout tracks={tracks}>
-        <TrackRefContext.Consumer>
-          {(track) => track && <ParticipantTile />}
-        </TrackRefContext.Consumer>
-      </GridLayout>
+      <TrackRefContext.Provider value={track}>
+        <ParticipantTile />
+      </TrackRefContext.Provider>
 
       {/* Fullscreen toggle button */}
       <button
@@ -185,13 +179,43 @@ function ScreenShareWithFullscreen({
       </button>
 
       {/* Participant name overlay */}
-      {tracks[0] && (
-        <div className="absolute top-3 left-3 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg">
-          <span className="text-sm font-medium text-white">
-            {tracks[0].participant.identity}の画面
-          </span>
-        </div>
-      )}
+      <div className="absolute top-3 left-3 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg">
+        <span className="text-sm font-medium text-white">
+          {track.participant.identity}の画面
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// 複数の画面共有をグリッド表示
+function ScreenShareWithFullscreen({
+  tracks,
+}: {
+  tracks: TrackReferenceOrPlaceholder[];
+}) {
+  // 1つの場合はシンプルに表示、複数の場合はグリッド表示
+  if (tracks.length === 1) {
+    return (
+      <div className="h-full">
+        <ScreenShareTile track={tracks[0]} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`grid gap-3 h-full ${
+        tracks.length === 2
+          ? "grid-cols-1 sm:grid-cols-2"
+          : tracks.length <= 4
+          ? "grid-cols-2"
+          : "grid-cols-2 sm:grid-cols-3"
+      }`}
+    >
+      {tracks.map((track) => (
+        <ScreenShareTile key={track.participant.identity} track={track} />
+      ))}
     </div>
   );
 }
